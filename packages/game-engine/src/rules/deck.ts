@@ -70,7 +70,9 @@ export function reshuffleDiscardIntoDeck(
   const top = discardPile[discardPile.length - 1]!;
   const toReshuffle = discardPile.slice(0, -1);
   return {
-    deck: shuffle(toReshuffle, rng),
+    // Any cards still in the deck stay on top of the draw order; the
+    // reshuffled discard remnants are appended beneath them.
+    deck: [...deck, ...shuffle(toReshuffle, rng)],
     discardPile: [top],
   };
 }
