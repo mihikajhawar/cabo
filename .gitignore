@@ -7,3 +7,8 @@ dist/
 .env.local
 coverage/
 .DS_Store
+
+# Python (taxi-rl)
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
