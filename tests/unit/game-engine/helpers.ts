@@ -1,6 +1,6 @@
-import type { PlayerId } from '@cabo/shared-types';
-import { asGameId, asPlayerId } from '@cabo/shared-types';
-import { createInitialGameState, reduce, type GameState } from '@cabo/game-engine';
+import type { CardInstanceId, PlayerId, Rank } from '@cabo/shared-types';
+import { asCardInstanceId, asGameId, asPlayerId } from '@cabo/shared-types';
+import { createInitialGameState, reduce, type CardInstance, type GameState } from '@cabo/game-engine';
 
 // A small, seeded LCG so tests are fully deterministic without depending on
 // Math.random — the same sequence every run, no snapshot flakiness.
@@ -43,4 +43,14 @@ export function setupPlayingGame(
   }
 
   return { state, playerIds };
+}
+
+export function card(id: string, rank: Rank, value: number): CardInstance {
+  return { id: asCardInstanceId(id), def: { rank, value } };
+}
+
+export function cardsById(cards: readonly CardInstance[]): Record<CardInstanceId, CardInstance> {
+  const map: Record<CardInstanceId, CardInstance> = {};
+  for (const c of cards) map[c.id] = c;
+  return map;
 }

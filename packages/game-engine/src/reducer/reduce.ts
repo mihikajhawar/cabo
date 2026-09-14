@@ -1,9 +1,16 @@
 import type { CardInstance } from '../model/card.js';
-import type { CardInstanceId } from '@cabo/shared-types';
+import type { CardInstanceId, PlayerId } from '@cabo/shared-types';
 import type { GameState } from '../model/game-state.js';
 import type { PlayerState } from '../model/player.js';
-import { CARDS_PER_PLAYER, MAX_PLAYERS, MIN_PLAYERS, dealInitialHands } from '../rules/dealing.js';
+import {
+  CARDS_PER_PLAYER,
+  INITIAL_PEEK_POSITIONS,
+  MAX_PLAYERS,
+  MIN_PLAYERS,
+  dealInitialHands,
+} from '../rules/dealing.js';
 import { createStandardDeck, reshuffleDiscardIntoDeck, shuffle } from '../rules/deck.js';
+import { grantKnowledge } from '../visibility/knowledge.js';
 import type { EngineAction } from './actions.js';
 import { err, ok, type EngineResult } from './errors.js';
 
@@ -32,25 +39,25 @@ export function reduce(
   }
 }
 
-function findPlayer(state: GameState, playerId: string): PlayerState | undefined {
+function findPlayer(state: GameState, playerId: PlayerId): PlayerState | undefined {
   return state.players.find((p) => p.id === playerId);
 }
 
 function updatePlayer(
   players: readonly PlayerState[],
-  playerId: string,
+  playerId: PlayerId,
   fn: (player: PlayerState) => PlayerState,
 ): PlayerState[] {
   return players.map((p) => (p.id === playerId ? fn(p) : p));
 }
 
-function handleJoinGame(state: GameState, playerId: string, displayName: string): EngineResult {
+function handleJoinGame(state: GameState, playerId: PlayerId, displayName: string): EngineResult {
   if (state.turn.phase !== 'LOBBY') return err('WRONG_PHASE');
   if (findPlayer(state, playerId)) return err('PLAYER_ALREADY_JOINED');
   if (state.players.length >= MAX_PLAYERS) return err('TOO_MANY_PLAYERS');
 
   const newPlayer: PlayerState = {
-    id: playerId as PlayerState['id'],
+    id: playerId,
     displayName,
     connected: true,
     hand: [],
@@ -63,7 +70,7 @@ function handleJoinGame(state: GameState, playerId: string, displayName: string)
   return ok({ ...state, players: [...state.players, newPlayer] });
 }
 
-function handleStartGame(state: GameState, playerId: string, rng: () => number): EngineResult {
+function handleStartGame(state: GameState, playerId: PlayerId, rng: () => number): EngineResult {
   if (state.turn.phase !== 'LOBBY') return err('WRONG_PHASE');
   if (state.hostPlayerId !== playerId) return err('NOT_HOST');
   if (state.players.length < MIN_PLAYERS) return err('NOT_ENOUGH_PLAYERS');
@@ -91,7 +98,7 @@ function handleStartGame(state: GameState, playerId: string, rng: () => number):
   });
 }
 
-function handleAckInitialPeek(state: GameState, playerId: string): EngineResult {
+function handleAckInitialPeek(state: GameState, playerId: PlayerId): EngineResult {
   if (state.turn.phase !== 'DEALING') return err('WRONG_PHASE');
   const player = findPlayer(state, playerId);
   if (!player) return err('UNKNOWN_PLAYER');
@@ -100,14 +107,23 @@ function handleAckInitialPeek(state: GameState, playerId: string): EngineResult 
   const players = updatePlayer(state.players, playerId, (p) => ({ ...p, ackedInitialPeek: true }));
   const allAcked = players.every((p) => p.ackedInitialPeek);
 
+  // §J: the initial deal grants each player knowledge of their 2
+  // pre-selected cards, at the moment they ack the peek.
+  let knowledge = state.knowledge;
+  for (const position of INITIAL_PEEK_POSITIONS) {
+    const cardId = player.hand[position];
+    if (cardId) knowledge = grantKnowledge(knowledge, playerId, cardId);
+  }
+
   return ok({
     ...state,
     players,
+    knowledge,
     turn: { ...state.turn, phase: allAcked ? 'PLAYING' : 'DEALING' },
   });
 }
 
-function handleDrawCard(state: GameState, playerId: string, rng: () => number): EngineResult {
+function handleDrawCard(state: GameState, playerId: PlayerId, rng: () => number): EngineResult {
   if (state.turn.phase !== 'PLAYING' || state.turn.awaitingCaboDecision) return err('WRONG_PHASE');
   if (state.turn.currentPlayerId !== playerId) return err('NOT_YOUR_TURN');
   if (state.turn.drawnCard !== null) return err('ALREADY_HOLDING_DRAWN_CARD');
@@ -123,15 +139,20 @@ function handleDrawCard(state: GameState, playerId: string, rng: () => number): 
 
   const [drawn, ...rest] = deck;
 
+  // §J: any draw-pile draw grants the drawer knowledge, immediately and
+  // unconditionally, regardless of where the card ends up.
+  const knowledge = grantKnowledge(state.knowledge, playerId, drawn!.id);
+
   return ok({
     ...state,
     deck: { cards: rest },
     discardPile,
+    knowledge,
     turn: { ...state.turn, drawnCard: drawn!.id },
   });
 }
 
-function handleDiscardCard(state: GameState, playerId: string): EngineResult {
+function handleDiscardCard(state: GameState, playerId: PlayerId): EngineResult {
   if (state.turn.phase !== 'PLAYING' || state.turn.awaitingCaboDecision) return err('WRONG_PHASE');
   if (state.turn.currentPlayerId !== playerId) return err('NOT_YOUR_TURN');
   if (state.turn.drawnCard === null) return err('NO_DRAWN_CARD');
@@ -145,7 +166,7 @@ function handleDiscardCard(state: GameState, playerId: string): EngineResult {
   });
 }
 
-function handleReplaceCard(state: GameState, playerId: string, position: number): EngineResult {
+function handleReplaceCard(state: GameState, playerId: PlayerId, position: number): EngineResult {
   if (state.turn.phase !== 'PLAYING' || state.turn.awaitingCaboDecision) return err('WRONG_PHASE');
   if (state.turn.currentPlayerId !== playerId) return err('NOT_YOUR_TURN');
   if (state.turn.drawnCard === null) return err('NO_DRAWN_CARD');
@@ -170,7 +191,7 @@ function handleReplaceCard(state: GameState, playerId: string, position: number)
   });
 }
 
-function handleEndTurn(state: GameState, playerId: string): EngineResult {
+function handleEndTurn(state: GameState, playerId: PlayerId): EngineResult {
   if (state.turn.phase !== 'PLAYING' || !state.turn.awaitingCaboDecision) return err('WRONG_PHASE');
   if (state.turn.currentPlayerId !== playerId) return err('NOT_YOUR_TURN');
 

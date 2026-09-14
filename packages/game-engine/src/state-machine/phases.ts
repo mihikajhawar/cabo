@@ -1,15 +1,5 @@
-// §E — full phase enum declared up front even though this milestone's reducer
-// only drives LOBBY → STARTING → DEALING → PLAYING; later milestones add
-// handling for the remaining phases without changing this type.
-export type GamePhase =
-  | 'LOBBY'
-  | 'STARTING'
-  | 'DEALING'
-  | 'PLAYING'
-  | 'POWER_RESOLUTION'
-  | 'CONTEST_WINDOW'
-  | 'CABO_LOCK'
-  | 'FINAL_TURNS'
-  | 'REVEAL'
-  | 'SCORING'
-  | 'ROUND_COMPLETE';
+// §E — canonical definition now lives in @cabo/shared-types (PlayerView.phase
+// needs it on the wire, without apps/web depending on this engine package).
+// Re-exported here so nothing in game-engine that already imports from
+// '../state-machine/phases.js' has to change.
+export type { GamePhase } from '@cabo/shared-types';

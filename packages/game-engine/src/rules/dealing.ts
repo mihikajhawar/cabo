@@ -6,6 +6,12 @@ export const MIN_PLAYERS = 2;
 // 52-card deck / 4 cards each — the ceiling a full deal can actually support.
 export const MAX_PLAYERS = 13;
 
+// §J: "Initial deal | each player | their 2 pre-selected cards." ACK_INITIAL_PEEK
+// carries no position payload, so which two cards are pre-selected is a fixed
+// convention rather than a player choice — the bottom two hand positions,
+// matching physical Cabo's "peek at your bottom two before play" rule.
+export const INITIAL_PEEK_POSITIONS = [2, 3] as const;
+
 export function dealInitialHands(
   playerIds: readonly PlayerId[],
   deck: readonly CardInstance[],
