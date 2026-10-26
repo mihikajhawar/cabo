@@ -1,37 +1,18 @@
 {
   "name": "cabo",
   "private": true,
-  "version": "0.0.0",
-  "engines": {
-    "node": ">=20"
-  },
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
   "scripts": {
-    "build": "pnpm -r --filter=./packages/* --filter=./apps/* run build",
-    "lint": "eslint .",
-    "typecheck": "pnpm -r run typecheck && tsc --noEmit -p tests/tsconfig.json",
-    "test": "vitest run",
-    "test:unit": "vitest run tests/unit",
-    "test:integration": "vitest run tests/integration",
-    "dev:web": "pnpm --filter @cabo/web dev",
-    "dev:server": "pnpm --filter @cabo/server dev"
+    "test": "npm test -w @cabo/game-engine && npm test -w @cabo/server",
+    "typecheck": "npm run typecheck -w @cabo/game-engine && npm run typecheck -w @cabo/server && npm run typecheck -w @cabo/web",
+    "dev:server": "npm run dev -w @cabo/server",
+    "dev:web": "npm run dev -w @cabo/web",
+    "dev": "concurrently -k -n server,web -c yellow,magenta \"npm run dev:server\" \"npm run dev:web\""
   },
   "devDependencies": {
-    "@cabo/game-engine": "workspace:*",
-    "@cabo/shared-types": "workspace:*",
-    "@eslint/js": "^9.17.0",
-    "eslint": "^9.17.0",
-    "eslint-config-prettier": "^9.1.0",
-    "prettier": "^3.4.2",
-    "typescript": "^5.7.2",
-    "typescript-eslint": "^8.18.0",
-    "vitest": "^2.1.8"
-  },
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "@prisma/client",
-      "@prisma/engines",
-      "esbuild",
-      "prisma"
-    ]
+    "concurrently": "^9.0.0"
   }
 }
