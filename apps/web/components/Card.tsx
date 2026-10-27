@@ -37,9 +37,9 @@ function Face({ def }: { def: CardDef }) {
   );
 }
 
-export function Card({ def, size, eligible, selected, locked, dim, onClick, title, delay, enter, flipIn, shake, className, testId, label, rest, vars }: {
+export function Card({ def, size, eligible, selected, locked, dim, onClick, title, delay, enter, flipIn, shake, className, testId, label, rest, vars, fid, kind }: {
   def: CardDef | null; size?: 'sm' | 'lg'; eligible?: boolean; selected?: boolean; locked?: boolean; dim?: boolean; onClick?: () => void; title?: string;
-  delay?: number; enter?: boolean; flipIn?: boolean; shake?: boolean; className?: string; testId?: string; label?: string; rest?: number; vars?: Record<string, string>;
+  delay?: number; enter?: boolean; flipIn?: boolean; shake?: boolean; className?: string; testId?: string; label?: string; rest?: number; vars?: Record<string, string>; fid?: string; kind?: 'hand' | 'held' | 'discard';
 }) {
   // Keep the last face on screen while the card turns back over, then drop it so nothing lingers in the page.
   const [shown, setShown] = useState<CardDef | null>(def);
@@ -54,7 +54,7 @@ export function Card({ def, size, eligible, selected, locked, dim, onClick, titl
   const style = { '--d': `${delay ?? 0}ms`, ...(rest !== undefined ? { '--rest': `${rest}deg` } : {}), ...vars } as CSSProperties;
   return (
     <div className={cls} style={style} onClick={eligible ? onClick : undefined} title={title} role={eligible ? 'button' : undefined}
-      aria-label={label} data-testid={testId} data-card={def ? `${def.rank}${def.suit}` : 'hidden'}>
+      aria-label={label} data-testid={testId} data-fid={fid} data-kind={kind} data-card={def ? `${def.rank}${def.suit}` : 'hidden'}>
       <div className={`flip ${up ? 'up' : ''}`}>
         <div className="face back card-back" />
         <div className={`face front card-face ${shown && isRed(shown) ? 'red' : ''}`}>{shown && <Face def={shown} />}</div>
@@ -66,9 +66,9 @@ export function Card({ def, size, eligible, selected, locked, dim, onClick, titl
 export function EmptySlot({ size }: { size?: 'sm' | 'lg' }) { return <div className={`card card-empty ${size ?? ''}`} />; }
 
 /** A hand as a 2x2 grid (a11 a12 / a21 a22), overflow cards continue below. Values only appear if `known` has them. */
-export function HandGrid({ cards, size, known, eligible, selected, onPick, locked, shaking, baseDelay = 0, reveal }: {
+export function HandGrid({ cards, size, known, eligible, selected, onPick, locked, shaking, reveal, track, baseDelay = 0 }: {
   cards: ViewCard[]; size?: 'sm' | 'lg'; known: Record<string, CardDef>; eligible: Set<string>; selected: Set<string>;
-  onPick: (cardId: string) => void; locked: boolean; shaking?: Set<string>; baseDelay?: number; reveal?: boolean;
+  onPick: (cardId: string) => void; locked: boolean; shaking?: Set<string>; reveal?: boolean; track?: boolean; baseDelay?: number;
 }) {
   const bySlot = new Map(cards.map((c) => [slotIndex(c.slot), c]));
   const max = Math.max(3, ...cards.map((c) => slotIndex(c.slot)));
@@ -77,8 +77,8 @@ export function HandGrid({ cards, size, known, eligible, selected, onPick, locke
     const c = bySlot.get(i);
     if (!c) { if (i < 4) cells.push(<EmptySlot key={`e${i}`} size={size} />); continue; }
     cells.push(
-      <Card key={c.cardId} def={c.def ?? known[c.cardId] ?? null} size={size} locked={locked} eligible={eligible.has(c.cardId)} enter
-        delay={baseDelay + i * 90} flipIn={reveal} shake={shaking?.has(c.cardId)}
+      <Card key={c.cardId} def={c.def ?? known[c.cardId] ?? null} size={size} locked={locked} eligible={eligible.has(c.cardId)}
+        delay={reveal ? baseDelay + i * 120 : 0} flipIn={reveal} shake={shaking?.has(c.cardId)} fid={track ? c.cardId : undefined} kind={track ? 'hand' : undefined}
         selected={selected.has(c.cardId)} onClick={() => onPick(c.cardId)} />,
     );
   }

@@ -53,8 +53,20 @@ describe('powers', () => {
     g.err('P1', { type: 'LOOK_AT_OWN_CARD', cardId: g.card('P2', 0) }, 'OWN_CARD_REQUIRED');
     const ev = g.do('P1', { type: 'LOOK_AT_OWN_CARD', cardId: g.card('P1', 1) });
     expect(ev.find((e) => e.type === 'PRIVATE_REVEAL')!.to).toBe('P1');
-    expect(JSON.stringify(ev.filter((e) => e.to !== 'P1'))).not.toContain('"def"');
+    expect(JSON.stringify(ev.filter((e) => e.to !== 'P1' && e.type !== 'CARD_DISCARDED'))).not.toContain('"def"');
+    // rule: a used power forces the discard; the toss window opens and replace/keep are not offered
+    expect(g.step()).toBe('CONTEST_WINDOW');
+    expect(g.s.discard).toHaveLength(1);
+    expect(g.p('P1').hand).toHaveLength(4);
+    g.err('P1', { type: 'REPLACE_CARD', cardId: g.card('P1', 0) }, 'WRONG_STEP');
+  });
+  it('skipping a power still allows discard or replace (the drawn card is only forced out when its power is used)', () => {
+    const g = ready().rig({ deck: ['8'] });
+    g.do('P1', { type: 'DRAW_CARD' });
+    g.do('P1', { type: 'SKIP_POWER' });
     expect(g.step()).toBe('AWAIT_DISPOSE');
+    g.do('P1', { type: 'REPLACE_CARD', cardId: g.card('P1', 0) });
+    expect(g.step()).toBe('CONTEST_WINDOW');
   });
   it('9/10 looks at opponent card only; not own; not locked', () => {
     const g = ready().rig({ deck: ['10'] });
@@ -62,7 +74,8 @@ describe('powers', () => {
     g.err('P1', { type: 'LOOK_AT_OPPONENT_CARD', cardId: g.card('P1', 0) }, 'OPPONENT_CARD_REQUIRED');
     const ev = g.do('P1', { type: 'LOOK_AT_OPPONENT_CARD', cardId: g.card('P2', 2) });
     expect(ev.filter((e) => e.type === 'PRIVATE_REVEAL').every((e) => e.to === 'P1')).toBe(true);
-    expect(JSON.stringify(ev.filter((e) => e.to !== 'P1'))).not.toContain('"def"');
+    expect(JSON.stringify(ev.filter((e) => e.to !== 'P1' && e.type !== 'CARD_DISCARDED'))).not.toContain('"def"');
+    expect(g.step()).toBe('CONTEST_WINDOW');
   });
   it('J/Q blind swap: all target combos; distinct required; nothing revealed', () => {
     const combos: [[string, number], [string, number]][] = [
@@ -76,8 +89,9 @@ describe('powers', () => {
       const ev = g.do('P1', { type: 'BLIND_SWAP', cardIdA: a, cardIdB: b });
       expect(g.p(pa).hand[ia]!.cardId).toBe(b);
       expect(g.p(pb).hand[ib]!.cardId).toBe(a);
-      expect(JSON.stringify(ev)).not.toContain('"def"');
+      expect(JSON.stringify(ev.filter((e) => e.type !== 'CARD_DISCARDED'))).not.toContain('"def"');
       expect(ev.some((e) => e.type === 'PRIVATE_REVEAL')).toBe(false);
+      expect(g.step()).toBe('CONTEST_WINDOW'); // forced discard after the power
     }
   });
   it('King: inspect then swap, and inspect then decline; red & black', () => {

@@ -132,7 +132,9 @@ h1, h2, h3, .display { font-family: var(--serif); letter-spacing: .02em; font-we
 .card.enter { animation: deal .5s cubic-bezier(.2,.8,.3,1) var(--d, 0ms) backwards; }
 .card.shake .flip { animation: shake .45s ease-in-out 1; }
 .card.drawn { animation: drawIn .5s cubic-bezier(.2,.8,.3,1) backwards; }
-.card.toss { transform: rotate(var(--rest, 0deg)); animation: toss .38s cubic-bezier(.2,.9,.3,1) backwards; }
+.card.rested { transform: rotate(var(--rest, 0deg)); }
+.card.stack .flip { box-shadow: -1px 1px 0 #d6c9ac, -2px 2px 0 #4d4535, -3px 3px 0 #d6c9ac, -4px 5px 10px rgba(0,0,0,.55); }
+.held-slot { position: absolute; left: calc(100% - 12px); top: 50%; margin-top: calc(var(--cw) * -.5); transform: rotate(9deg); z-index: 2; }
 .card.window .flip { box-shadow: 0 0 0 2px rgba(214,184,122,.95), 0 6px 16px rgba(0,0,0,.6); animation: windowRing .9s ease-in-out infinite; }
 .pile .flip { box-shadow: 1px 1px 0 #d6c9ac, 2px 2px 0 #5b5240, 3px 3px 0 #d6c9ac, 4px 4px 0 #5b5240, 5px 7px 12px rgba(0,0,0,.6); }
 .pile.p1 .flip { box-shadow: 1px 1px 0 #d6c9ac, 2px 3px 7px rgba(0,0,0,.6); }

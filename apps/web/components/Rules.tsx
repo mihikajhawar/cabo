@@ -35,15 +35,15 @@ export function RulesModal({ onClose }: { onClose: () => void }) {
           </Section>
 
           <Section title="The deal">
-            <p>Everyone gets 4 cards in a 2×2 grid, face down. You may look at your <b>two bottom cards</b> once, then they turn face down again. One card starts the discard pile. You never see anyone else&apos;s cards unless a power shows you.</p>
+            <p>Everyone gets 4 cards in a 2×2 grid, face down. You may look at your <b>two bottom cards</b> once, then they turn face down again. The discard pile starts empty; it begins with the first card the first player discards. You never see anyone else&apos;s cards unless a power shows you.</p>
           </Section>
 
           <Section title="On your turn">
             <ol className="list-decimal pl-6 space-y-1">
               <li><b>Draw</b> one card from the draw pile. You can never take from the discard pile. You see what you drew.</li>
-              <li><b>Use its power</b> if it has one (below) — or skip it.</li>
-              <li><b>Discard</b> the drawn card, <i>or</i> <b>replace</b> one of your own cards with it (the replaced card is discarded face up).</li>
-              <li>A <b>2-second toss window</b> opens (below).</li>
+              <li><b>Use its power</b> if it has one (below) — or skip it. <b>If you use the power, the card is discarded automatically.</b></li>
+              <li>Otherwise <b>discard</b> the drawn card, <i>or</i> <b>replace</b> one of your own cards with it (the replaced card is discarded face up).</li>
+              <li>A <b>5-second toss window</b> opens (below).</li>
               <li>Then you may <b>call CABO</b> or <b>end your turn</b>.</li>
             </ol>
             <p className="text-sm opacity-75">If you have no cards, you can&apos;t replace — you may keep the drawn card instead.</p>
@@ -61,11 +61,11 @@ export function RulesModal({ onClose }: { onClose: () => void }) {
           </Section>
 
           <Section title="Tossing (contesting)">
-            <p>Whenever a card lands on the discard pile, <b>anyone</b> gets 2 seconds to toss a card of the <b>same rank</b> onto it — one of their own, or even someone else&apos;s. A red King and a black King count as the same rank. The first correct toss wins; the window then closes.</p>
+            <p>Whenever a card lands on the discard pile, <b>anyone</b> gets 5 seconds to toss a card of the <b>same rank</b> onto it — one of their own, or even someone else&apos;s. A red King and a black King count as the same rank. The first correct toss wins; the window then closes.</p>
             <ul className="list-disc pl-6 space-y-1">
               <li><b>Your own card:</b> it leaves your hand (your hand gets smaller).</li>
-              <li><b>Someone else&apos;s card:</b> it&apos;s removed from their hand, and you give them one of your cards. If you have no cards, you draw one from the pile and give them that instead.</li>
-              <li><b>Wrong guess:</b> the card you tossed is shown to everyone and stays where it was, and you draw one penalty card (only you see it).</li>
+              <li><b>Someone else&apos;s card:</b> it&apos;s removed from their hand, and you give them one of your cards. If you have no cards, you draw one from the pile and give it to them without looking at it.</li>
+              <li><b>Wrong guess:</b> the card you tossed is shown to everyone and stays where it was, and you draw one penalty card, which goes into your hand <b>face down — nobody sees it, not even you</b>.</li>
             </ul>
           </Section>
 

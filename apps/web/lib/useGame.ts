@@ -29,7 +29,7 @@ export function useGame() {
   const [toast, setToast] = useState<string | null>(null);
   const [banner, setBanner] = useState<Banner | null>(null);
   const lastTurn = useRef('');
-  const [windowEnds, setWindowEnds] = useState<{ id: number; at: number } | null>(null);
+  const [windowEnds, setWindowEnds] = useState<{ id: number; at: number; ms: number } | null>(null);
 
   const say = useCallback((msg: string) => { setToast(msg); setTimeout(() => setToast((t) => (t === msg ? null : t)), 3500); }, []);
   const addLog = (lines: string[]) => lines.length && setLog((l) => [...l, ...lines].slice(-80));
@@ -54,6 +54,7 @@ export function useGame() {
           break;
         }
         case 'CARD_DRAWN': sfx.deal(); lines.push(`${who(d.playerId)} drew a card.`); break;
+        case 'PENALTY_DRAWN': if (d.drawn) { sfx.deal(); lines.push(`${who(d.playerId)} drew a penalty card.`); } break;
         case 'DRAW_SKIPPED': lines.push('The deck is empty — nothing to draw.'); break;
         case 'CARD_DISCARDED': sfx.toss(); lines.push(`${who(d.playerId)} discarded ${cardLabel(d.def)}.`); break;
         case 'CARD_REPLACED': sfx.toss(); lines.push(`${who(d.playerId)} swapped in the drawn card, discarding ${cardLabel(d.discarded)}.`); break;
@@ -103,7 +104,7 @@ export function useGame() {
       viewRef.current = u.view;
       setView(u.view);
       const w = u.view.turn?.window;
-      if (w) setWindowEnds((cur) => (cur?.id === w.windowId ? cur : { id: w.windowId, at: performance.now() + w.expiresInMs }));
+      if (w) setWindowEnds((cur) => (cur?.id === w.windowId ? cur : { id: w.windowId, at: performance.now() + w.expiresInMs, ms: w.expiresInMs }));
       const tk = u.view.turn && u.view.turn.ownerId === u.view.you.playerId && u.view.turn.step === 'AWAIT_DRAW' ? `${u.view.roundNumber}:${u.view.turn.ownerId}:${u.view.discardCount}:${u.view.drawPileCount}` : '';
       if (tk && tk !== lastTurn.current) sfx.turn();
       lastTurn.current = tk;

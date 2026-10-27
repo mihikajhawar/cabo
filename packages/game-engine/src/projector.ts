@@ -27,6 +27,7 @@ export interface PlayerView {
   }[];
   drawPileCount: number;
   discardTop: CardDef | null;
+  discardTopId: CardId | null; // face-up and public; lets the client animate the same card as it moves
   discardCount: number;
   turn: null | {
     step: string; ownerId: PlayerId; isFinalTurn: boolean;
@@ -116,6 +117,7 @@ export function projectFor(s: GameState, viewerId: PlayerId, now = 0): PlayerVie
     })),
     drawPileCount: s.deck.length,
     discardTop: topId ? s.cards[topId]! : null,
+    discardTopId: topId ?? null,
     discardCount: s.discard.length,
     turn: t && st ? {
       step: st.kind, ownerId: t.ownerId, isFinalTurn: t.isFinalTurn,

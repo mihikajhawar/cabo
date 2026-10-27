@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { dispatch, projectFor } from '../src';
+import { dispatch, projectFor, CONTEST_WINDOW_MS } from '../src';
 import { G } from './harness';
 
 // P1 discards a 7 -> window open with 7 on top.
@@ -46,10 +46,11 @@ describe('contesting', () => {
     const ev = g.do('P2', { type: 'CONTEST_CARD', cardId: g.card('P3', 0) });
     expect(g.p('P2').hand).toHaveLength(0);
     expect(g.p('P3').hand.map((h) => h.cardId)).toContain(nextTop);
-    expect(g.s.knowledge['P2']!.has(nextTop)).toBe(true);
+    // the substitute card is never seen by anyone: not by the giver, not by the receiver
+    expect(g.s.knowledge['P2']?.has(nextTop) ?? false).toBe(false);
     expect(g.s.knowledge['P3']?.has(nextTop) ?? false).toBe(false);
-    expect(ev.find((e) => e.type === 'PRIVATE_REVEAL')!.to).toBe('P2');
-    expect(JSON.stringify(ev.filter((e) => e.to === 'ALL' && e.type === 'CARD_GIVEN'))).not.toContain('def');
+    expect(ev.some((e) => e.type === 'PRIVATE_REVEAL')).toBe(false);
+    expect(JSON.stringify(ev)).not.toContain('"def":{"rank":"K_RED"');
     expect(g.step()).toBe('AWAIT_CABO_DECISION');
   });
   it('wrong contest: public reveal, card stays, private penalty draw, window stays open (T4)', () => {
@@ -60,9 +61,13 @@ describe('contesting', () => {
     expect(wrong.to).toBe('ALL'); expect((wrong.data.def as any).rank).toBe('9');
     expect(g.p('P2').hand.map((h) => h.cardId)).toContain(card);
     expect(g.p('P2').hand).toHaveLength(before + 1);
-    const pen = ev.find((e) => e.type === 'PRIVATE_REVEAL')!;
-    expect(pen.to).toBe('P2');
-    expect(JSON.stringify(ev.filter((e) => e.to !== 'P2' && e.type !== 'WRONG_CONTEST'))).not.toContain(String((pen.data.def as any).suit + (pen.data.def as any).rank));
+    // the penalty card goes into the hand face-down and is never revealed to anyone, including its owner
+    expect(ev.some((e) => e.type === 'PRIVATE_REVEAL')).toBe(false);
+    const penId = ev.find((e) => e.type === 'PENALTY_DRAWN')!.data.cardId as string;
+    expect(g.p('P2').hand.map((h) => h.cardId)).toContain(penId);
+    expect(g.s.knowledge['P2']?.has(penId) ?? false).toBe(false);
+    const seen = projectFor(g.s, 'P2').players.find((p) => p.playerId === 'P2')!.hand.find((h) => h.cardId === penId)!;
+    expect(seen.def).toBeNull();
     expect(g.step()).toBe('CONTEST_WINDOW'); // still open
     g.do('P3', { type: 'CONTEST_CARD', cardId: g.card('P3', 0) }); // another wrong one is fine too
   });
@@ -79,12 +84,13 @@ describe('contesting', () => {
     g.do('P2', { type: 'CONTEST_CARD', cardId: g.card('P2', 0) });
     expect(g.p('P2').hand).toHaveLength(0);
   });
-  it('expiry: 1999ms accepted, 2000ms rejected; stale timer harmless (T7)', () => {
+  it('the toss window is 5 seconds', () => { expect(CONTEST_WINDOW_MS).toBe(5000); });
+  it('expiry: just inside the window accepted, at the deadline rejected; stale timer harmless (T7)', () => {
     const g = open7({ P2: ['7'] });
     const w = (g.s.turn!.step as any).window;
-    g.env.t = w.openedAt + 2000;
+    g.env.t = w.openedAt + CONTEST_WINDOW_MS;
     g.err('P2', { type: 'CONTEST_CARD', cardId: g.card('P2', 0) }, 'WINDOW_CLOSED');
-    g.env.t = w.openedAt + 1999;
+    g.env.t = w.openedAt + CONTEST_WINDOW_MS - 1;
     g.do('P2', { type: 'CONTEST_CARD', cardId: g.card('P2', 0) });
     g.do('SERVER', { type: 'EXPIRE_WINDOW', windowId: w.windowId }); // stale: no-op
     expect(g.step()).toBe('AWAIT_CABO_DECISION');

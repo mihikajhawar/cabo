@@ -7,24 +7,28 @@ import { Results } from './Results';
 import { RulesButton } from './Rules';
 import { cardLabel, POWER_NAME } from '../lib/format';
 import type { Banner, Peek } from '../lib/useGame';
+import { useFlip } from '../lib/useFlip';
 
+const HOLDING = ['AWAIT_POWER_DECISION', 'AWAIT_DISPOSE', 'AWAIT_KING_DECISION'];
 type Act = (a: Record<string, unknown>) => Promise<boolean>;
 interface Props {
   view: PlayerView; log: string[]; peeks: Peek[]; dismissPeek: (id: number) => void; flash: Record<string, CardDef>;
-  toast: string | null; banner: Banner | null; windowEnds: { id: number; at: number } | null; act: Act;
+  toast: string | null; banner: Banner | null; windowEnds: { id: number; at: number; ms: number } | null; act: Act;
 }
 
-function Countdown({ endsAt }: { endsAt: number }) {
+function Countdown({ endsAt, total }: { endsAt: number; total: number }) {
   const [p, setP] = useState(1); const raf = useRef(0);
   useEffect(() => {
-    const tick = () => { setP(Math.max(0, (endsAt - performance.now()) / 2000)); raf.current = requestAnimationFrame(tick); };
+    const tick = () => { setP(Math.max(0, (endsAt - performance.now()) / total)); raf.current = requestAnimationFrame(tick); };
     tick(); return () => cancelAnimationFrame(raf.current);
-  }, [endsAt]);
+  }, [endsAt, total]);
   return <div className="timer w-full"><i style={{ width: `${p * 100}%` }} /></div>;
 }
 
 export function Table({ view, log, peeks, dismissPeek, flash, toast, banner, windowEnds, act }: Props) {
   const me = view.you.playerId;
+  const rootRef = useRef<HTMLDivElement>(null);
+  useFlip(rootRef);
   const nameOf = (id: string) => view.players.find((p) => p.playerId === id)?.displayName ?? 'Someone';
   const mine = view.players.find((p) => p.playerId === me)!;
   const opponents = view.players.filter((p) => p.playerId !== me && !p.hasLeft);
@@ -85,7 +89,7 @@ export function Table({ view, log, peeks, dismissPeek, flash, toast, banner, win
   const drawn = view.you.drawnCard;
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen flex flex-col" ref={rootRef} data-turn-owner={view.turn?.ownerId ?? ''}>
       <header className="flex flex-wrap items-center justify-between px-4 py-3 gap-2">
         <div className="display text-xl tracking-[.25em] uppercase" style={{ color: 'var(--ivory)' }}>Cabo <span className="opacity-60 text-sm ml-2 whitespace-nowrap">table {view.gameCode} · round {view.roundNumber}</span></div>
         <div className="flex gap-2"><SoundToggle /><RulesButton label="Rules" />
@@ -94,13 +98,16 @@ export function Table({ view, log, peeks, dismissPeek, flash, toast, banner, win
 
       <div className="felt mx-2 sm:mx-6 mb-3 p-3 sm:p-5 flex-1 flex flex-col gap-4">
         <section className="flex flex-wrap justify-center gap-3" aria-label="Opponents">
-          {opponents.map((p, i) => (
-            <div key={p.playerId} className={`seat ${t?.ownerId === p.playerId ? 'turn' : ''}`} data-testid={`seat-${p.displayName}`}>
+          {opponents.map((p) => (
+            <div key={p.playerId} className={`seat relative ${t?.ownerId === p.playerId ? 'turn' : ''}`} data-testid={`seat-${p.displayName}`} data-seat-id={p.playerId}>
               <div className="flex items-center gap-2 justify-center mb-2 display text-base">
                 <span className="dot" style={{ background: p.connected ? '#7bd88f' : '#8a6a4a' }} />
                 {p.displayName}{p.isCaboCaller && <span className="px-2 rounded-full text-xs" style={{ background: 'var(--oxblood)' }}>CABO</span>}
               </div>
-              <HandGrid cards={p.hand} size="sm" known={known} eligible={eligible} selected={selected} onPick={pick} locked={p.handLocked} shaking={shaking} baseDelay={i * 160} />
+              <HandGrid cards={p.hand} size="sm" known={known} eligible={eligible} selected={selected} onPick={pick} locked={p.handLocked} shaking={shaking} track />
+              {t?.ownerId === p.playerId && HOLDING.includes(t.step) && (
+                <div className="held-slot"><Card def={null} size="sm" fid={`held:${p.playerId}`} kind="held" className="held" /></div>
+              )}
             </div>
           ))}
         </section>
@@ -109,28 +116,28 @@ export function Table({ view, log, peeks, dismissPeek, flash, toast, banner, win
           <div className="flex items-end justify-center gap-5 sm:gap-8">
             <div className="text-center">
               {view.drawPileCount > 0
-                ? <Card def={null} className={`pile ${view.drawPileCount < 6 ? 'p1' : view.drawPileCount < 20 ? 'p2' : ''}`} eligible={allowed.has('DRAW_CARD')} onClick={() => act({ type: 'DRAW_CARD' })} label="Draw pile" testId="draw-pile" />
+                ? <Card def={null} className={`pile ${view.drawPileCount < 6 ? 'p1' : view.drawPileCount < 20 ? 'p2' : ''}`} eligible={allowed.has('DRAW_CARD')} onClick={() => act({ type: 'DRAW_CARD' })} label="Draw pile" testId="draw-pile" fid="pile" />
                 : <EmptySlot />}
               <div className="text-sm mt-1 opacity-70">draw · {view.drawPileCount}</div>
             </div>
             <div className="text-center">
-              {view.discardTop ? <Card key={`${view.discardTop.rank}${view.discardTop.suit}${view.discardCount}`} def={view.discardTop} className={`toss ${t?.step === 'CONTEST_WINDOW' ? 'window' : ''}`} rest={((view.discardCount * 37) % 9) - 4} /> : <EmptySlot />}
+              {view.discardTop ? <Card key={view.discardTopId ?? view.discardCount} def={view.discardTop} fid={view.discardTopId ?? undefined} kind="discard" className={`rested ${view.discardCount > 1 ? 'stack' : ''} ${t?.step === 'CONTEST_WINDOW' ? 'window' : ''}`} rest={((view.discardCount * 37) % 9) - 4} /> : <EmptySlot />}
               <div className="text-sm mt-1 opacity-70">discard · {view.discardCount}</div>
             </div>
             {view.phase !== 'DEALING' && view.you.inspecting.length > 0 && (
-              <div className="text-center rise">
+              <div className="text-center">
                 <div className="flex gap-2">{view.you.inspecting.map((c) => <Card key={c.cardId} def={c.def} flipIn />)}</div>
                 <div className="text-sm mt-1" style={{ color: 'var(--candle)' }}>you are inspecting</div>
               </div>
             )}
             {drawn && (
-              <div className="text-center rise">
-                <Card key={`${drawn.def.rank}${drawn.def.suit}${view.drawPileCount}`} def={drawn.def} size="lg" className="drawn" flipIn />
+              <div className="text-center">
+                <Card key={drawn.cardId} def={drawn.def} size="lg" fid={drawn.cardId} kind="held" flipIn />
                 <div className="text-sm mt-1" style={{ color: 'var(--candle)' }}>you drew</div>
               </div>
             )}
           </div>
-          {t?.step === 'CONTEST_WINDOW' && windowEnds && <div className="w-48"><Countdown endsAt={windowEnds.at} /></div>}
+          {t?.step === 'CONTEST_WINDOW' && windowEnds && <div className="w-48"><Countdown endsAt={windowEnds.at} total={windowEnds.ms} /></div>}
           <p className={`status-line text-center max-w-xl min-h-[2.4em] text-lg ${isMyTurn && view.phase !== 'DEALING' ? 'mine' : ''}`} key={stepKey} data-testid="status">{status}</p>
           {power && isMyTurn && t?.step === 'AWAIT_POWER_DECISION' && <p className="text-center text-sm opacity-75">Power: {power}.</p>}
           {t?.isFinalTurn && t.finalTurnsRemaining && <p className="text-sm opacity-75">Final turns left: {t.finalTurnsRemaining.map(nameOf).join(', ')}</p>}
@@ -141,7 +148,7 @@ export function Table({ view, log, peeks, dismissPeek, flash, toast, banner, win
             {mine.displayName} <span className="opacity-60 text-sm">(you)</span>
             {mine.isCaboCaller && <span className="px-2 rounded-full text-xs" style={{ background: 'var(--oxblood)' }}>CABO</span>}
           </div>
-          <HandGrid cards={mine.hand} known={known} eligible={eligible} selected={selected} onPick={pick} locked={mine.handLocked} shaking={shaking} baseDelay={opponents.length * 160} />
+          <HandGrid cards={mine.hand} known={known} eligible={eligible} selected={selected} onPick={pick} locked={mine.handLocked} shaking={shaking} track />
           {mine.hand.length === 0 && <p className="text-center opacity-70 mt-2">No cards — you score 0.</p>}
         </section>
       </div>

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { io as connect, type Socket } from 'socket.io-client';
-import { testEnv } from '@cabo/game-engine';
+import { CONTEST_WINDOW_MS, testEnv } from '@cabo/game-engine';
 import { startServer } from '../src/server';
 import type { Timers } from '../src/manager';
 
@@ -146,7 +146,7 @@ describe('contest race over real sockets (T6)', () => {
     if (owner.last.turn.step === 'AWAIT_POWER_DECISION') await owner.act({ type: 'SKIP_POWER' });
     await owner.act({ type: 'DISCARD_CARD' }); await owner.settle();
     expect(owner.last.turn.step).toBe('CONTEST_WINDOW');
-    expect(timers.q.some((t) => t.live && t.ms === 2000)).toBe(true);
+    expect(timers.q.some((t) => t.live && t.ms === CONTEST_WINDOW_MS)).toBe(true);
     timers.fireAll(); await owner.settle();
     expect(owner.last.turn.step).toBe('AWAIT_CABO_DECISION');
   });

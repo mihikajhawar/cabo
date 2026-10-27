@@ -5,7 +5,7 @@ import type {
   PowerKind, Result, TurnStep,
 } from './types';
 
-export const CONTEST_WINDOW_MS = 2000;
+export const CONTEST_WINDOW_MS = 5000;
 export const MIN_PLAYERS = 2;
 export const MAX_PLAYERS = 6;
 
@@ -128,8 +128,7 @@ function apply(c: Ctx, actor: PlayerId | 'SERVER', a: Action): void {
       know(s, me.id, entry.cardId);
       emit(c, me.id, 'PRIVATE_REVEAL', { cardId: entry.cardId, def: s.cards[entry.cardId], reason: 'LOOK_OWN' });
       emit(c, 'ALL', 'POWER_USED', { kind: 'LOOK_OWN', playerId: me.id, targets: [entry.cardId] });
-      s.turn!.step = { kind: 'AWAIT_DISPOSE', drawnCardId: st.drawnCardId };
-      return;
+      return discardAfterPower(c, me, st.drawnCardId);
     }
     case 'LOOK_AT_OPPONENT_CARD': {
       const st = needPower(c, me.id, 'LOOK_OPPONENT');
@@ -138,8 +137,7 @@ function apply(c: Ctx, actor: PlayerId | 'SERVER', a: Action): void {
       know(s, me.id, a.cardId);
       emit(c, me.id, 'PRIVATE_REVEAL', { cardId: a.cardId, def: s.cards[a.cardId], reason: 'LOOK_OPPONENT' });
       emit(c, 'ALL', 'POWER_USED', { kind: 'LOOK_OPPONENT', playerId: me.id, targets: [a.cardId] });
-      s.turn!.step = { kind: 'AWAIT_DISPOSE', drawnCardId: st.drawnCardId };
-      return;
+      return discardAfterPower(c, me, st.drawnCardId);
     }
     case 'BLIND_SWAP': {
       const st = needPower(c, me.id, 'BLIND_SWAP');
@@ -147,8 +145,7 @@ function apply(c: Ctx, actor: PlayerId | 'SERVER', a: Action): void {
       const ta = resolveTarget(s, a.cardIdA), tb = resolveTarget(s, a.cardIdB);
       swapEntries(ta.entry, tb.entry);
       emit(c, 'ALL', 'CARDS_SWAPPED', { playerId: me.id, cardIdA: a.cardIdA, cardIdB: a.cardIdB });
-      s.turn!.step = { kind: 'AWAIT_DISPOSE', drawnCardId: st.drawnCardId };
-      return;
+      return discardAfterPower(c, me, st.drawnCardId);
     }
     case 'KING_INSPECT': {
       const st = needPower(c, me.id, 'KING');
@@ -168,14 +165,11 @@ function apply(c: Ctx, actor: PlayerId | 'SERVER', a: Action): void {
         swapEntries(resolveTarget(s, st.a).entry, resolveTarget(s, st.b).entry);
         emit(c, 'ALL', 'CARDS_SWAPPED', { playerId: me.id, cardIdA: st.a, cardIdB: st.b });
       }
-      s.turn!.step = { kind: 'AWAIT_DISPOSE', drawnCardId: st.drawnCardId };
-      return;
+      return discardAfterPower(c, me, st.drawnCardId);
     }
     case 'DISCARD_CARD': {
       const st = needDispose(c, me.id);
-      discardCard(s, st.drawnCardId);
-      emit(c, 'ALL', 'CARD_DISCARDED', { playerId: me.id, def: s.cards[st.drawnCardId] });
-      return openWindow(c, st.drawnCardId);
+      return discardDrawn(c, me, st.drawnCardId);
     }
     case 'REPLACE_CARD': {
       const st = needDispose(c, me.id);
@@ -294,11 +288,9 @@ function startRound(c: Ctx, starterId: PlayerId): void {
       emit(c, p.id, 'PRIVATE_REVEAL', { cardId: e.cardId, def: s.cards[e.cardId], reason: 'INITIAL_PEEK' });
     }
   }
-  const top = s.deck.shift()!; // starting discard: no power, no contest window
-  s.discard.push(top); s.publicKnowledge.add(top);
   s.starterId = starterId;
   s.phase = 'DEALING';
-  emit(c, 'ALL', 'ROUND_DEALT', { roundNumber: s.roundNumber, starterId, discardTop: s.cards[top] });
+  emit(c, 'ALL', 'ROUND_DEALT', { roundNumber: s.roundNumber, starterId });
 }
 
 function checkAllAcked(c: Ctx): void {
@@ -356,6 +348,15 @@ function endRound(c: Ctx): void {
   emit(c, 'ALL', 'ROUND_SCORED', { result });
 }
 
+/** Discard the drawn card face-up and open the toss window. */
+function discardDrawn(c: Ctx, me: PlayerState, cardId: CardId): void {
+  discardCard(c.s, cardId);
+  emit(c, 'ALL', 'CARD_DISCARDED', { playerId: me.id, cardId, def: c.s.cards[cardId] });
+  return openWindow(c, cardId);
+}
+/** Rule: once a card's power has been used, the card must be discarded (no replace, no keep). */
+function discardAfterPower(c: Ctx, me: PlayerState, cardId: CardId): void { return discardDrawn(c, me, cardId); }
+
 // ---------- contest ----------
 function openWindow(c: Ctx, topCardId: CardId): void {
   const s = c.s;
@@ -381,11 +382,9 @@ function contest(c: Ctx, me: PlayerState, cardId: CardId): void {
     emit(c, 'ALL', 'WRONG_CONTEST', { playerId: me.id, cardId, def });
     const pen = drawFromPile(c);
     if (pen !== null) {
-      me.hand.push({ cardId: pen, slot: freeSlot(me) });
-      know(s, me.id, pen);
-      emit(c, me.id, 'PRIVATE_REVEAL', { cardId: pen, def: s.cards[pen], reason: 'PENALTY' });
+      me.hand.push({ cardId: pen, slot: freeSlot(me) }); // arrives face-down: the penalty card is never seen
     }
-    emit(c, 'ALL', 'PENALTY_DRAWN', { playerId: me.id, drawn: pen !== null, drawPileCount: s.deck.length });
+    emit(c, 'ALL', 'PENALTY_DRAWN', { playerId: me.id, cardId: pen, drawn: pen !== null, drawPileCount: s.deck.length });
     return;
   }
 
@@ -402,8 +401,6 @@ function contest(c: Ctx, me: PlayerState, cardId: CardId): void {
   // zero-card contester: draw a card and hand it straight to the target
   const sub = drawFromPile(c);
   if (sub !== null) {
-    know(s, me.id, sub);
-    emit(c, me.id, 'PRIVATE_REVEAL', { cardId: sub, def: s.cards[sub], reason: 'SUBSTITUTE_DRAW' });
     target.player.hand.push({ cardId: sub, slot: freeSlot(target.player) });
     emit(c, 'ALL', 'CARD_GIVEN', { from: me.id, to: target.player.id, cardId: sub, substitute: true });
   }

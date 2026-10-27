@@ -43,13 +43,14 @@ describe('lobby & deal (B1-B5)', () => {
     g.do('P2', { type: 'START_GAME' });
     g.err('P9', { type: 'JOIN_GAME', displayName: 'Late' }, 'GAME_STARTED');
   });
-  it('deals 4 each + 1 starting discard; starter goes first; unique ids', () => {
+  it('deals 4 each; the discard pile is empty until the first turn; starter goes first; unique ids', () => {
     const g = new G(4);
     g.do('P3', { type: 'START_GAME' });
     const s = g.s;
     expect(s.players.every((p) => p.hand.length === 4)).toBe(true);
-    expect(s.discard).toHaveLength(1);
-    expect(s.deck).toHaveLength(52 - 16 - 1);
+    expect(s.discard).toHaveLength(0);
+    expect(projectFor(s, 'P1').discardTop).toBeNull();
+    expect(s.deck).toHaveLength(52 - 16);
     expect(new Set(Object.keys(s.cards)).size).toBe(52);
     expect(s.phase).toBe('DEALING');
     for (const id of g.ids) g.do(id, { type: 'ACK_INITIAL_PEEK' });
