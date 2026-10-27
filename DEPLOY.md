@@ -4,12 +4,13 @@ You need two things running on the internet: the **game server** (long-running, 
 and the **website**. They can't be a pure "serverless" host, the server must stay running.
 
 ## Easiest: Render (render.yaml in this repo)
-1. Push this folder to a GitHub repo.
-2. On render.com: New -> Blueprint -> pick the repo. It creates `cabo-server` and `cabo-web`.
-3. When `cabo-server` is live, copy its URL (https://....onrender.com).
-4. In `cabo-web` -> Environment, set `NEXT_PUBLIC_SERVER_URL` to that URL, then redeploy `cabo-web`.
-5. Copy the `cabo-web` URL into `cabo-server` -> Environment as `CORS_ORIGIN`, redeploy the server.
-6. Open the `cabo-web` URL, create a table, send friends the invite link.
+1. Push this project to a GitHub repo (done if you are reading this on GitHub).
+2. On render.com: sign in with GitHub, then New -> Blueprint -> pick the repo -> Apply. It creates the server, the website and a database.
+3. Wait for both services to show "Live" (the first build takes a few minutes).
+4. Open https://mihika-cabo-web.onrender.com, create a table, and send friends the invite link.
+
+If Render renames a service (name already taken), set `NEXT_PUBLIC_SERVER_URL` on the website to the server's real address
+and redeploy the website, and set `CORS_ORIGIN` on the server to the website's real address.
 
 Notes
 - Free instances go to sleep when idle; a sleeping/restarting server drops games in progress

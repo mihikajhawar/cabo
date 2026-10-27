@@ -1,25 +1,32 @@
-# Render Blueprint: two web services (game server + website).
-# Deploy order: 1) server  2) copy its public URL into the web service's NEXT_PUBLIC_SERVER_URL  3) copy the web URL into the server's CORS_ORIGIN.
+# Render Blueprint: game server + website (+ optional database).
+# One click: Render > New > Blueprint > pick this repo > Apply.
+# The two services have fixed names, so their addresses are known in advance:
+#   server  https://mihika-cabo-server.onrender.com
+#   website https://mihika-cabo-web.onrender.com   <- share this one with friends
+# (If Render says a name is taken it adds letters; then set the two values below to the real addresses and redeploy.)
 services:
   - type: web
-    name: cabo-server
+    name: mihika-cabo-server
     runtime: node
-    buildCommand: npm install
+    plan: free
+    buildCommand: npm install --omit=dev
     startCommand: npm run start -w @cabo/server
     healthCheckPath: /health
     envVars:
       - key: DATABASE_URL
-        fromDatabase: { name: cabo-db, property: connectionString }
+        fromDatabase: { name: mihika-cabo-db, property: connectionString }
       - key: CORS_ORIGIN
-        sync: false   # e.g. https://cabo-web.onrender.com
+        value: https://mihika-cabo-web.onrender.com
   - type: web
-    name: cabo-web
+    name: mihika-cabo-web
     runtime: node
-    buildCommand: npm install && npm run build -w @cabo/web
+    plan: free
+    buildCommand: npm install --include=dev && npm run build -w @cabo/web
     startCommand: npm run start -w @cabo/web
     envVars:
-      - key: NEXT_PUBLIC_SERVER_URL
-        sync: false   # e.g. https://cabo-server.onrender.com  (needed at BUILD time; redeploy after changing)
+      - key: NEXT_PUBLIC_SERVER_URL   # baked in at BUILD time; redeploy the website after changing it
+        value: https://mihika-cabo-server.onrender.com
 
 databases:
-  - name: cabo-db   # PostgreSQL; the server creates its tables on first start
+  - name: mihika-cabo-db   # PostgreSQL, free plan (Render deletes free databases after 30 days; the game keeps working without it)
+    plan: free
